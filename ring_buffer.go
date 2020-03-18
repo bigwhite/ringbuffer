@@ -99,7 +99,7 @@ func (r *RingBuffer) ReadByte() (b byte, err error) {
 
 // Write writes len(p) bytes from p to the underlying buf.
 // It returns the number of bytes written from p (0 <= n <= len(p)) and any error encountered that caused the write to stop early.
-// Write returns a non-nil error if it returns n < len(p).
+// Write returns a (0, ErrTooManyDataToWrite) if avail space is less than len(p), we do not support half write.
 // Write must not modify the slice data, even temporarily.
 func (r *RingBuffer) Write(p []byte) (n int, err error) {
 	if len(p) == 0 {
@@ -120,7 +120,9 @@ func (r *RingBuffer) Write(p []byte) (n int, err error) {
 
 	if len(p) > avail {
 		err = ErrTooManyDataToWrite
-		p = p[:avail]
+		r.mu.Unlock()
+		return 0, err
+
 	}
 	n = len(p)
 
