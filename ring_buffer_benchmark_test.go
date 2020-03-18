@@ -6,7 +6,19 @@ import (
 )
 
 func BenchmarkRingBuffer_Sync(b *testing.B) {
-	rb := New(1024)
+	rb := New(1024, true)
+	data := []byte(strings.Repeat("a", 512))
+	buf := make([]byte, 512)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		rb.Write(data)
+		rb.Read(buf)
+	}
+}
+
+func BenchmarkRingBuffer_Sync_NoProtected(b *testing.B) {
+	rb := New(1024, false)
 	data := []byte(strings.Repeat("a", 512))
 	buf := make([]byte, 512)
 
@@ -18,7 +30,7 @@ func BenchmarkRingBuffer_Sync(b *testing.B) {
 }
 
 func BenchmarkRingBuffer_AsyncRead(b *testing.B) {
-	rb := New(1024)
+	rb := New(1024, true)
 	data := []byte(strings.Repeat("a", 512))
 	buf := make([]byte, 512)
 
@@ -35,7 +47,7 @@ func BenchmarkRingBuffer_AsyncRead(b *testing.B) {
 }
 
 func BenchmarkRingBuffer_AsyncWrite(b *testing.B) {
-	rb := New(1024)
+	rb := New(1024, true)
 	data := []byte(strings.Repeat("a", 512))
 	buf := make([]byte, 512)
 

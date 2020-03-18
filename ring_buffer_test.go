@@ -8,7 +8,7 @@ import (
 )
 
 func TestRingBuffer_interface(t *testing.T) {
-	rb := New(1)
+	rb := New(1, true)
 	var _ io.Writer = rb
 	var _ io.Reader = rb
 	// var _ io.StringWriter = rb
@@ -17,7 +17,7 @@ func TestRingBuffer_interface(t *testing.T) {
 }
 
 func TestRingBuffer_Write(t *testing.T) {
-	rb := New(64)
+	rb := New(64, true)
 
 	// check empty or full
 	if !rb.IsEmpty() {
@@ -168,7 +168,7 @@ func TestRingBuffer_Write(t *testing.T) {
 }
 
 func TestRingBuffer_Read(t *testing.T) {
-	rb := New(64)
+	rb := New(64, true)
 
 	// check empty or full
 	if !rb.IsEmpty() {
@@ -244,7 +244,7 @@ func TestRingBuffer_Read(t *testing.T) {
 }
 
 func TestRingBuffer_ByteInterface(t *testing.T) {
-	rb := New(2)
+	rb := New(2, true)
 
 	// write one
 	err := rb.WriteByte('a')

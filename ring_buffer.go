@@ -23,14 +23,16 @@ type RingBuffer struct {
 	r      int // next position to read
 	w      int // next position to write
 	isFull bool
+	isSync bool // whether protected by mutex
 	mu     sync.Mutex
 }
 
 // New returns a new RingBuffer whose buffer has the given size.
-func New(size int) *RingBuffer {
+func New(size int, isSync bool) *RingBuffer {
 	return &RingBuffer{
-		buf:  make([]byte, size),
-		size: size,
+		buf:    make([]byte, size),
+		size:   size,
+		isSync: isSync,
 	}
 }
 
@@ -42,9 +44,13 @@ func (r *RingBuffer) Read(p []byte) (n int, err error) {
 		return 0, nil
 	}
 
-	r.mu.Lock()
+	if r.isSync {
+		r.mu.Lock()
+	}
 	if r.w == r.r && !r.isFull {
-		r.mu.Unlock()
+		if r.isSync {
+			r.mu.Unlock()
+		}
 		return 0, ErrIsEmpty
 	}
 
@@ -55,7 +61,9 @@ func (r *RingBuffer) Read(p []byte) (n int, err error) {
 		}
 		copy(p, r.buf[r.r:r.r+n])
 		r.r = (r.r + n) % r.size
-		r.mu.Unlock()
+		if r.isSync {
+			r.mu.Unlock()
+		}
 		return
 	}
 
@@ -75,15 +83,21 @@ func (r *RingBuffer) Read(p []byte) (n int, err error) {
 	r.r = (r.r + n) % r.size
 
 	r.isFull = false
-	r.mu.Unlock()
+	if r.isSync {
+		r.mu.Unlock()
+	}
 	return n, err
 }
 
 // ReadByte reads and returns the next byte from the input or ErrIsEmpty.
 func (r *RingBuffer) ReadByte() (b byte, err error) {
-	r.mu.Lock()
+	if r.isSync {
+		r.mu.Lock()
+	}
 	if r.w == r.r && !r.isFull {
-		r.mu.Unlock()
+		if r.isSync {
+			r.mu.Unlock()
+		}
 		return 0, ErrIsEmpty
 	}
 	b = r.buf[r.r]
@@ -93,7 +107,9 @@ func (r *RingBuffer) ReadByte() (b byte, err error) {
 	}
 
 	r.isFull = false
-	r.mu.Unlock()
+	if r.isSync {
+		r.mu.Unlock()
+	}
 	return b, err
 }
 
@@ -105,9 +121,13 @@ func (r *RingBuffer) Write(p []byte) (n int, err error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
-	r.mu.Lock()
+	if r.isSync {
+		r.mu.Lock()
+	}
 	if r.w == r.r && r.isFull {
-		r.mu.Unlock()
+		if r.isSync {
+			r.mu.Unlock()
+		}
 		return 0, ErrIsFull
 	}
 
@@ -120,7 +140,9 @@ func (r *RingBuffer) Write(p []byte) (n int, err error) {
 
 	if len(p) > avail {
 		err = ErrTooManyDataToWrite
-		r.mu.Unlock()
+		if r.isSync {
+			r.mu.Unlock()
+		}
 		return 0, err
 
 	}
@@ -148,16 +170,22 @@ func (r *RingBuffer) Write(p []byte) (n int, err error) {
 	if r.w == r.r {
 		r.isFull = true
 	}
-	r.mu.Unlock()
+	if r.isSync {
+		r.mu.Unlock()
+	}
 
 	return n, err
 }
 
 // WriteByte writes one byte into buffer, and returns ErrIsFull if buffer is full.
 func (r *RingBuffer) WriteByte(c byte) error {
-	r.mu.Lock()
+	if r.isSync {
+		r.mu.Lock()
+	}
 	if r.w == r.r && r.isFull {
-		r.mu.Unlock()
+		if r.isSync {
+			r.mu.Unlock()
+		}
 		return ErrIsFull
 	}
 	r.buf[r.w] = c
@@ -169,15 +197,19 @@ func (r *RingBuffer) WriteByte(c byte) error {
 	if r.w == r.r {
 		r.isFull = true
 	}
-	r.mu.Unlock()
+	if r.isSync {
+		r.mu.Unlock()
+	}
 
 	return nil
 }
 
 // Length return the length of available read bytes.
 func (r *RingBuffer) Length() int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	if r.isSync {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+	}
 
 	if r.w == r.r {
 		if r.isFull {
@@ -200,8 +232,10 @@ func (r *RingBuffer) Capacity() int {
 
 // Free returns the length of available bytes to write.
 func (r *RingBuffer) Free() int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	if r.isSync {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+	}
 
 	if r.w == r.r {
 		if r.isFull {
@@ -227,8 +261,10 @@ func (r *RingBuffer) WriteString(s string) (n int, err error) {
 
 // Bytes returns all available read bytes. It does not move the read pointer and only copy the available data.
 func (r *RingBuffer) Bytes() []byte {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	if r.isSync {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+	}
 
 	if r.w == r.r {
 		if r.isFull {
@@ -262,24 +298,30 @@ func (r *RingBuffer) Bytes() []byte {
 
 // IsFull returns this ringbuffer is full.
 func (r *RingBuffer) IsFull() bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	if r.isSync {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+	}
 
 	return r.isFull
 }
 
 // IsEmpty returns this ringbuffer is empty.
 func (r *RingBuffer) IsEmpty() bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	if r.isSync {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+	}
 
 	return !r.isFull && r.w == r.r
 }
 
 // Reset the read pointer and writer pointer to zero.
 func (r *RingBuffer) Reset() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	if r.isSync {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+	}
 
 	r.r = 0
 	r.w = 0
